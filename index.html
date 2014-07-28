@@ -7,7 +7,7 @@
       body { height: 100%; margin: 0; padding: 0 }
       #map-canvas { height: 100% }
     </style>
-    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=places&key=AIzaSyDnjYLV394W5VhR4biqKLTXPJ1CcsM0k5Y"></script>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=places,geometry&key=AIzaSyDnjYLV394W5VhR4biqKLTXPJ1CcsM0k5Y"></script>
     <script type="text/javascript">
       // Cache to keep load off geolocate API, pre-populated with the example result
       var addressCache = {"747 6th St S. Kirkland, WA 98033":{"address_components":[{"long_name":"747","short_name":"747","types":["street_number"]},{"long_name":"6th Street South","short_name":"6th St S","types":["route"]},{"long_name":"Everest","short_name":"Everest","types":["neighborhood","political"]},{"long_name":"Kirkland","short_name":"Kirkland","types":["locality","political"]},{"long_name":"King County","short_name":"King County","types":["administrative_area_level_2","political"]},{"long_name":"Washington","short_name":"WA","types":["administrative_area_level_1","political"]},{"long_name":"United States","short_name":"US","types":["country","political"]},{"long_name":"98033","short_name":"98033","types":["postal_code"]}],"formatted_address":"747 6th Street South, Kirkland, WA 98033, USA","geometry":{"location":new google.maps.LatLng(47.6695431,-122.19691620000003),"location_type":"ROOFTOP","viewport":{"xa":{"k":47.6681941197085,"j":47.67089208029149},"pa":{"j":-122.19826518029151,"k":-122.1955672197085}}},"types":["street_address"]}};
@@ -15,6 +15,8 @@
       var geocoder;
       var map;
       var places;
+      var highlightCirc;
+
 
       function isFunction(functionToCheck) {
        var getType = {};
@@ -23,7 +25,7 @@
 
       function initialize() {
         // TODO eventually use browser location
-        var home = new google.maps.LatLng(47.702989,-122.173529);
+        var home = new google.maps.LatLng(47.6695431,-122.19691620000003);
 
         geocoder = new google.maps.Geocoder();
 
@@ -89,7 +91,8 @@
         var request = {
           location: map.getCenter(),
           radius: radius,
-          query: search
+          query: search,
+          rankBy: google.maps.places.RankBy.DISTANCE
         };
 
         places.textSearch(request, searchCallback);
@@ -100,13 +103,21 @@
           console.log("Search Sucess: ", results, status);
 
           var resultsBuilder = '';
+          var radius = parseFloat(document.getElementById("radius").value);
 
           for (var i = 0; i < results.length; i++) {
             var place = results[i];
-            createMarker(results[i]);
 
-            // TODO better results
-            resultsBuilder += '<li>' + results[i].name + '<br/>' + results[i].formatted_address + '</li>'
+            var dist = google.maps.geometry.spherical.computeDistanceBetween(map.getCenter(), place.geometry.location);
+            console.log(dist, radius);
+            if (dist <= radius) {
+              createMarker(place);
+
+              // TODO better results
+              resultsBuilder += '<li>' + place.name + ', ' + Math.round(dist) + 'm<br/>' + place.formatted_address + '</li>'
+            } else {
+              console.log('Skipped: ' + place.name);
+            }
           }
 
           document.getElementById("results").innerHTML += resultsBuilder;
@@ -126,6 +137,12 @@
       }
 
       function highlightSearchArea(radius) {
+        // Clear the old circle
+        if (highlightCirc) {
+          highlightCirc.setMap(null);
+          highlightCirc = null;
+        }
+
         var highlightOptions = {
           strokeColor: '#FF0000',
           strokeOpacity: 0.5,
@@ -136,8 +153,9 @@
           center: map.getCenter(),
           radius: radius
         };
+
         // Add the circle for this city to the map.
-        var highlightCirc = new google.maps.Circle(highlightOptions);
+        highlightCirc = new google.maps.Circle(highlightOptions);
 
         map.fitBounds(highlightCirc.getBounds());
       }
@@ -167,7 +185,7 @@
       <div>
         <form onsubmit="try { doSearch(); } finally { return false; }">
           <label for="center">Location:</label><input id="center" type="text" size="40" value="747 6th St S. Kirkland, WA 98033" />
-          <label for="radius">Radius:</label><input id="radius" type="text" size="40" value="12874.8" />
+          <label for="radius">Radius (m):</label><input id="radius" type="text" size="40" value="1500" />
           <label for="search">Search:</label><input id="search" type="text" size="40" value="chiropractor" />
           <button type="submit">Submit</button>
         </form>
